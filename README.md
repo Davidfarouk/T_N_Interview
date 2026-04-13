@@ -15,6 +15,88 @@ A physical device at the shop entrance detects when a customer walks in and send
 
 ---
 
+## Architecture
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph Clients["External Clients"]
+        DEV["Physical Device\nshop entrance sensor"]
+        BROWSER["Browser\nlive dashboard"]
+    end
+
+    subgraph APP["Fastify Server  :3000"]
+        STATIC["Static Files\nindex.html"]
+
+        subgraph ROUTES["Routes Layer"]
+            R_V["visit.routes.ts\nPOST /visits · GET /visits"]
+            R_C["customer.routes.ts\nPOST /customers · GET /customers"]
+            R_S["stats.routes.ts\nGET /stats/hourly"]
+            R_CF["config.routes.ts\nGET /config"]
+        end
+
+        subgraph SERVICE["Service Layer"]
+            SVC["visit.service.ts\nX visits = 1 tree rule\natomic transaction"]
+        end
+
+        subgraph REPO["Repository Layer"]
+            CREPO["customer.repo.ts\nread · write customers"]
+            VREPO["visit.repo.ts\ninsert · aggregate visits"]
+        end
+    end
+
+    DB[("SQLite\ndata/data.db")]
+
+    DEV -->|"POST /visits"| R_V
+    BROWSER -->|"GET /"| STATIC
+    BROWSER -->|"API calls"| ROUTES
+
+    R_V --> SVC
+    SVC --> CREPO
+    SVC --> VREPO
+    R_C --> CREPO
+    R_S --> VREPO
+
+    CREPO --> DB
+    VREPO --> DB
+```
+
+### Visit Event Flow
+
+What happens inside the server on every `POST /visits`:
+
+```mermaid
+sequenceDiagram
+    participant Device as Physical Device
+    participant Route as visit.routes.ts
+    participant Service as visit.service.ts
+    participant Repo as repositories
+    participant DB as SQLite
+
+    Device->>Route: POST /visits { customerId: 7 }
+    Route->>Service: processVisit(7)
+    Service->>Repo: findCustomerById(7)
+    Repo->>DB: SELECT * FROM customers WHERE id = 7
+    DB-->>Repo: customer row
+    Repo-->>Service: Customer object
+
+    Note over Service,DB: BEGIN TRANSACTION
+    Service->>Repo: updateLastSeen(7)
+    Service->>Repo: insertVisit(7)
+    Service->>Repo: getVisitCount(7)
+    DB-->>Service: totalVisits = 3
+    Service->>Repo: incrementTreesPlanted(7)
+    Service->>Repo: getTreesPlanted(7)
+    DB-->>Service: totalTrees = 1
+    Note over Service,DB: COMMIT
+
+    Service-->>Route: treePlanted: true, totalTrees: 1
+    Route-->>Device: HTTP 200 { success: true, treePlanted: true }
+```
+
+---
+
 ## Quick Start (Docker — recommended)
 
 The fastest way to run the project. No Node.js installation required.
@@ -233,13 +315,7 @@ src/
 └── server.ts       # Entry point — starts the server
 ```
 
-The architecture follows a strict layered pattern:
-
-```
-HTTP Request → Route → Service → Repository → Database
-```
-
-Each layer has one job. Routes handle HTTP. Services handle business rules. Repositories handle SQL. Nothing crosses those boundaries.
+Each layer has one job. Routes handle HTTP. Services handle business rules. Repositories handle SQL. Nothing crosses those boundaries. See the [Architecture](#architecture) diagrams above for the full picture.
 
 ---
 
