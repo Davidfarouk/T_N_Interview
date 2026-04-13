@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tree Nation Dashboard</title>
+  <style>
+    :root {
+      --green-dark:  #1b5e20;
+      --green-mid:   #2e7d32;
+      --green-light: #4caf50;
+      --green-pale:  #e8f5e9;
+      --green-border:#c8e6c9;
+      --bg:          #f1f8f1;
+      --card:        #ffffff;
+      --text:        #1a2e1a;
+      --muted:       #6a8a6a;
+      --shadow:      0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      background: var(--green-dark);
+      color: #fff;
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    nav .brand { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.3px; }
+    nav .brand span { opacity: 0.7; font-weight: 400; font-size: 0.85rem; margin-left: 0.6rem; }
+
+    .x-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.82rem;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .x-badge strong { color: #69f0ae; }
+
+    nav .nav-right { display: flex; align-items: center; gap: 1rem; }
+
+    nav a {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.3);
+      transition: background 0.2s;
+    }
+    nav a:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+    .refresh-badge {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.5);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #69f0ae; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── LAYOUT ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    .col-span-2 { grid-column: span 2; }
+
+    section { margin-bottom: 1.25rem; }
+
+    /* ── KPI CARDS ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
+
+    .kpi {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      box-shadow: var(--shadow);
+      border-left: 4px solid var(--green-light);
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .kpi .label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .kpi .value { font-size: 2rem; font-weight: 700; color: var(--green-dark); line-height: 1; }
+    .kpi .sub   { font-size: 0.78rem; color: var(--muted); }
+
+    .kpi.highlight { border-left-color: #ff8f00; background: #fffde7; }
+    .kpi.highlight .value { color: #e65100; }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid var(--green-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-header h2 { font-size: 0.95rem; font-weight: 600; color: var(--green-dark); }
+    .card-body { padding: 1.25rem; }
+
+    /* ── SIMULATE ── */
+    .visit-form { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+
+    .visit-form input {
+      flex: 1;
+      min-width: 180px;
+      padding: 0.55rem 0.85rem;
+      border: 1.5px solid var(--green-border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .visit-form input:focus { border-color: var(--green-mid); }
+
+    .btn {
+      padding: 0.55rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--green-mid); color: #fff; }
+    .btn-primary:hover { background: var(--green-dark); }
+    .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.78rem; font-weight: 500; }
+    .btn-ghost { background: var(--green-pale); color: var(--green-dark); }
+    .btn-ghost:hover { background: var(--green-border); }
+
+    .toast {
+      font-size: 0.84rem;
+      font-weight: 500;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      opacity: 0;
+      transition: opacity 0.25s;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+    .toast.ok   { background: var(--green-pale); color: var(--green-dark); }
+    .toast.err  { background: #fdecea; color: #c62828; }
+    .toast.tree {
+      background: #1b5e20;
+      color: #fff;
+      font-size: 0.92rem;
+      padding: 0.5rem 1rem;
+      animation: pop 0.3s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* ── CHART ── */
+    .chart-wrap {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 140px;
+      padding: 0 0.25rem;
+      overflow-x: auto;
+    }
+
+    .bar-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      min-width: 36px;
+      max-width: 80px;
+    }
+
+    .bar-col .bar-val {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .bar-col .bar-rect {
+      width: 100%;
+      background: linear-gradient(180deg, #66bb6a, #2e7d32);
+      border-radius: 5px 5px 0 0;
+      transition: height 0.5s cubic-bezier(.4,0,.2,1);
+      min-height: 4px;
+    }
+
+    .bar-col .bar-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 70px;
+    }
+
+    .chart-axis {
+      border-top: 1.5px solid var(--green-border);
+      margin: 0 0.25rem 0.5rem;
+    }
+
+    /* ── TABLE ── */
+    .table-wrap { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead th {
+      text-align: left;
+      padding: 0.55rem 0.85rem;
+      background: var(--green-pale);
+      color: var(--green-dark);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    tbody td {
+      padding: 0.6rem 0.85rem;
+      border-top: 1px solid #f0f4f0;
+      color: var(--text);
+    }
+    tbody tr:hover td { background: var(--green-pale); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: #fff9c4;
+      color: #f57f17;
+      border-radius: 999px;
+      padding: 0.15rem 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .progress-wrap { display: flex; align-items: center; gap: 0.5rem; }
+    .progress-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #66bb6a, #2e7d32);
+      border-radius: 3px;
+      transition: width 0.4s;
+    }
+    .progress-label { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+
+    /* ── EMPTY ── */
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 2rem;
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 1.5rem;
+    }
+
+    @media (max-width: 680px) {
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .col-span-2 { grid-column: span 1; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">🌳 Tree Nation <span>Dashboard</span></div>
+  <div class="nav-right">
+    <div class="x-badge">Every <strong id="nav-x">…</strong> visits = 🌳 1 tree</div>
+    <div class="refresh-badge"><div class="dot"></div> Live</div>
+    <a href="/docs" target="_blank">API Docs →</a>
+  </div>
+</nav>
+
+<main>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" id="kpis">
+    <div class="kpi"><div class="label">Total Customers</div><div class="value" id="kpi-customers">—</div><div class="sub">registered</div></div>
+    <div class="kpi"><div class="label">Total Visits</div><div class="value" id="kpi-visits">—</div><div class="sub">all time</div></div>
+    <div class="kpi highlight"><div class="label">Trees Planted</div><div class="value" id="kpi-trees">—</div><div class="sub">across all customers</div></div>
+    <div class="kpi"><div class="label">This Hour</div><div class="value" id="kpi-hour">—</div><div class="sub">visits in current hour</div></div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- LEFT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+      <!-- New Customer -->
+      <div class="card">
+        <div class="card-header"><h2>New Customer</h2></div>
+        <div class="card-body">
+          <div class="visit-form">
+            <input id="new-customer-name" type="text" placeholder="Customer name (e.g. Alice)" />
+            <button class="btn btn-primary" id="btn-create-customer">Add Customer</button>
+          </div>
+          <div style="margin-top:0.75rem;min-height:1.5rem;">
+            <span class="toast" id="toast-customer"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Simulate Visit -->
+      <div class="card">
+        <div class="card-header"><h2>Send Visit Event</h2></div>
+        <div class="card-body">
+          <div class="visit-form">
+            <select id="customer-select" style="flex:1;padding:0.55rem 0.75rem;border:1.5px solid var(--green-border);border-radius:8px;font-size:0.9rem;outline:none;background:#fff;">
+              <option value="">— select a customer —</option>
+            </select>
+            <button class="btn btn-primary" id="btn-visit">Send Visit</button>
+          </div>
+          <div style="margin-top:0.75rem;min-height:1.5rem;">
+            <span class="toast" id="toast"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hourly Chart -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Visits per Hour</h2>
+          <button class="btn btn-ghost btn-sm" id="btn-refresh-stats">Refresh</button>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap" id="chart-wrap">
+            <p class="empty" style="width:100%">Loading…</p>
+          </div>
+          <div class="chart-axis"></div>
+          <p style="font-size:0.75rem;color:var(--muted);text-align:center" id="stats-status"></p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="card col-span-1" style="display:flex;flex-direction:column;">
+      <div class="card-header">
+        <h2>Customers</h2>
+        <button class="btn btn-ghost btn-sm" id="btn-refresh-customers">Refresh</button>
+      </div>
+      <div class="card-body" style="padding:0;flex:1;overflow:auto;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Visits</th>
+                <th>Next Tree</th>
+                <th>Trees</th>
+                <th>Last Seen</th>
+              </tr>
+            </thead>
+            <tbody id="customers-body">
+              <tr><td colspan="5" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="padding:0.6rem 1rem;border-top:1px solid var(--green-border);">
+        <p style="font-size:0.75rem;color:var(--muted)" id="customers-status"></p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Recent Visits -->
+  <section>
+    <div class="card">
+      <div class="card-header">
+        <h2>Recent Visits</h2>
+        <button class="btn btn-ghost btn-sm" id="btn-refresh-visits">Refresh</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Customer</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody id="visits-body">
+              <tr><td colspan="3" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="padding:0.6rem 1rem;border-top:1px solid var(--green-border);">
+        <p style="font-size:0.75rem;color:var(--muted)" id="visits-status"></p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>Tree Nation · auto-refreshes every 15s</footer>
+
+<script type="module">
+  let VISITS_PER_TREE = 5;
+  let _customers = null, _stats = null;
+
+  // ── CREATE CUSTOMER ──
+  async function createCustomer() {
+    const input = document.getElementById('new-customer-name');
+    const name = input.value.trim();
+    if (!name) { showToast('toast-customer', 'Name is required', 'err'); return; }
+    try {
+      const res = await fetch('/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      showToast('toast-customer', `✓ Customer "${data.name}" created (ID: ${data.id})`, 'ok');
+      input.value = '';
+      await loadCustomers();
+    } catch (err) {
+      showToast('toast-customer', 'Failed: ' + err.message, 'err');
+    }
+  }
+
+  // ── SEND VISIT ──
+  async function sendVisit() {
+    const select = document.getElementById('customer-select');
+    const customerId = parseInt(select.value);
+    if (!customerId) { showToast('toast', 'Select a customer first', 'err'); return; }
+    const customerName = select.options[select.selectedIndex].text;
+    try {
+      const res = await fetch('/visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (data.treePlanted) {
+        showToast('toast', `🌳 Tree planted! ${customerName} now has ${data.totalTrees} tree${data.totalTrees !== 1 ? 's' : ''} (visit #${data.totalVisits})`, 'tree');
+      } else {
+        showToast('toast', `✓ Visit #${data.totalVisits} for ${customerName} — ${data.visitsUntilNextTree} more until next tree`, 'ok');
+      }
+
+      await Promise.all([loadCustomers(), loadStats(), loadVisits()]);
+    } catch (err) {
+      showToast('toast', 'Failed: ' + err.message, 'err');
+    }
+  }
+
+  // ── LOAD CUSTOMERS ──
+  async function loadCustomers() {
+    const tbody = document.getElementById('customers-body');
+    try {
+      const res = await fetch('/customers');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      // update dropdown
+      const select = document.getElementById('customer-select');
+      const current = select.value;
+      select.innerHTML = '<option value="">— select a customer —</option>' +
+        data.map(c => `<option value="${c.id}">${c.name} (#${c.id})</option>`).join('');
+      if (current) select.value = current;
+
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No customers yet — add one first.</td></tr>';
+        updateKpis(data, null);
+        return;
+      }
+
+      tbody.innerHTML = data.map(c => {
+        const visitsToNextTree = VISITS_PER_TREE - (c.totalVisits % VISITS_PER_TREE || VISITS_PER_TREE);
+        const pct = visitsToNextTree === 0 ? 100 : ((VISITS_PER_TREE - visitsToNextTree) / VISITS_PER_TREE) * 100;
+        const nextLabel = visitsToNextTree === 0 ? '🌳 just planted!' : `${visitsToNextTree} to go`;
+
+        return `<tr>
+          <td style="color:var(--muted);font-size:0.8rem">${c.id}</td>
+          <td><strong>${c.name}</strong></td>
+          <td>${c.totalVisits}</td>
+          <td>
+            <div class="progress-wrap">
+              <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+              <span class="progress-label">${nextLabel}</span>
+            </div>
+          </td>
+          <td>${c.treesPlanted > 0 ? `<span class="badge">🌳 ${c.treesPlanted}</span>` : '<span style="color:var(--muted)">0</span>'}</td>
+          <td style="color:var(--muted);font-size:0.82rem">${c.lastSeenAt ? timeAgo(c.lastSeenAt) : '—'}</td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('customers-status').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      updateKpis(data, null);
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty">Error: ${err.message}</td></tr>`;
+    }
+  }
+
+  // ── LOAD STATS ──
+  async function loadStats() {
+    const wrap = document.getElementById('chart-wrap');
+    try {
+      const res = await fetch('/stats/hourly');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (!data.length) {
+        wrap.innerHTML = '<p class="empty" style="width:100%">No visits yet.</p>';
+        updateKpis(null, []);
+        return;
+      }
+
+      const recent = data.slice(0, 12).reverse();
+      const max = Math.max(...recent.map(d => d.visits));
+
+      wrap.innerHTML = recent.map(d => {
+        const h = parseInt(d.hour.split(' ')[1]);
+        const heightPx = Math.max(4, (d.visits / max) * 120);
+        return `<div class="bar-col">
+          <div class="bar-val">${d.visits}</div>
+          <div class="bar-rect" style="height:${heightPx}px"></div>
+          <div class="bar-label">${String(h).padStart(2,'0')}:00</div>
+        </div>`;
+      }).join('');
+
+      document.getElementById('stats-status').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      updateKpis(null, data);
+    } catch (err) {
+      wrap.innerHTML = `<p class="empty" style="width:100%">Error: ${err.message}</p>`;
+    }
+  }
+
+  // ── KPIs ──
+  function updateKpis(customers, stats) {
+    if (customers !== null) _customers = customers;
+    if (stats !== null) _stats = stats;
+
+    if (_customers !== null) {
+      document.getElementById('kpi-customers').textContent = _customers.length;
+      document.getElementById('kpi-visits').textContent = _customers.reduce((s, c) => s + c.totalVisits, 0);
+      document.getElementById('kpi-trees').textContent = _customers.reduce((s, c) => s + c.treesPlanted, 0);
+    }
+
+    if (_stats !== null && _stats.length) {
+      const now = new Date();
+      const currentHour = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:00`;
+      const thisHour = _stats.find(s => s.hour === currentHour);
+      document.getElementById('kpi-hour').textContent = thisHour ? thisHour.visits : 0;
+    } else if (_stats !== null) {
+      document.getElementById('kpi-hour').textContent = 0;
+    }
+  }
+
+  // ── LOAD VISITS ──
+  async function loadVisits() {
+    const tbody = document.getElementById('visits-body');
+    try {
+      const res = await fetch('/visits?limit=50');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty">No visits yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(v => `<tr>
+        <td style="color:var(--muted);font-size:0.8rem">${v.id}</td>
+        <td><strong>${v.customerName}</strong> <span style="color:var(--muted);font-size:0.8rem">#${v.customerId}</span></td>
+        <td style="color:var(--muted);font-size:0.82rem">${timeAgo(v.visitedAt)}</td>
+      </tr>`).join('');
+
+      document.getElementById('visits-status').textContent =
+        `${data.length} most recent · updated ${new Date().toLocaleTimeString()}`;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="3" class="empty">Error: ${err.message}</td></tr>`;
+    }
+  }
+
+  // ── HELPERS ──
+  function showToast(id, msg, type) {
+    const t = document.getElementById(id);
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.className = 'toast', 3500);
+  }
+
+  function timeAgo(dateStr) {
+    const d = new Date(dateStr + (dateStr.includes('Z') ? '' : 'Z'));
+    const diff = Math.floor((Date.now() - d) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return d.toLocaleDateString();
+  }
+
+  function pad(n) { return String(n).padStart(2,'0'); }
+
+  // ── INIT ──
+  async function loadConfig() {
+    try {
+      const data = await fetch('/config').then(r => r.json());
+      VISITS_PER_TREE = data.visitsPerTree;
+      document.getElementById('nav-x').textContent = VISITS_PER_TREE;
+    } catch (_) {}
+  }
+
+  document.getElementById('btn-create-customer').addEventListener('click', createCustomer);
+  document.getElementById('btn-visit').addEventListener('click', sendVisit);
+  document.getElementById('btn-refresh-stats').addEventListener('click', loadStats);
+  document.getElementById('btn-refresh-customers').addEventListener('click', loadCustomers);
+  document.getElementById('btn-refresh-visits').addEventListener('click', loadVisits);
+  document.getElementById('new-customer-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') createCustomer();
+  });
+
+  await loadConfig();
+  await Promise.all([loadCustomers(), loadStats(), loadVisits()]);
+  setInterval(() => Promise.all([loadCustomers(), loadStats(), loadVisits()]), 15000);
+</script>
+</body>
+</html>
