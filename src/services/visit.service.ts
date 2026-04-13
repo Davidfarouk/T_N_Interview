@@ -1,7 +1,13 @@
 import { config } from '../config/env';
-import { findCustomerById, updateLastSeen, incrementTreesPlanted, getVisitCount, getTreesPlanted } from '../repositories/customer.repo';
+import { withTransaction } from '../db/database';
+import {
+  findCustomerById,
+  updateLastSeen,
+  incrementTreesPlanted,
+  getVisitCount,
+  getTreesPlanted,
+} from '../repositories/customer.repo';
 import { insertVisit } from '../repositories/visit.repo';
-import { getDb } from '../db/database'; // used only for the transaction wrapper
 
 export interface VisitResult {
   treePlanted: boolean;
@@ -10,13 +16,14 @@ export interface VisitResult {
   visitsUntilNextTree: number;
 }
 
-export function processVisit(customerId: number): VisitResult | null {
+export function processVisit(customerId: number): VisitResult {
   const customer = findCustomerById(customerId);
-  if (!customer) return null;
 
-  const db = getDb();
+  if (!customer) {
+    throw Object.assign(new Error('Customer not found'), { statusCode: 404 });
+  }
 
-  const process = db.transaction((): VisitResult => {
+  return withTransaction((): VisitResult => {
     updateLastSeen(customerId);
     insertVisit(customerId);
 
@@ -28,10 +35,8 @@ export function processVisit(customerId: number): VisitResult | null {
     return {
       treePlanted,
       totalVisits,
-      totalTrees: getTreesPlanted(customerId),
+      totalTrees:          getTreesPlanted(customerId),
       visitsUntilNextTree: config.VISITS_PER_TREE - (totalVisits % config.VISITS_PER_TREE),
     };
   });
-
-  return process();
 }

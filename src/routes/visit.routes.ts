@@ -1,14 +1,15 @@
 import { FastifyInstance } from 'fastify';
-import { postVisitJsonSchema } from '../schemas/visit.schema';
 import { processVisit } from '../services/visit.service';
 import { getRecentVisits } from '../repositories/visit.repo';
+import { visitBodySchema, visitResponseSchema } from '../schemas/visit.schema';
+import { errorSchema } from '../schemas/error.schema';
 
 export async function visitRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/visits', {
     schema: {
       tags: ['Visits'],
       summary: 'List recent visits',
-      description: 'Returns the 50 most recent visit records with customer info.',
+      description: 'Returns the most recent visit records with customer info.',
       querystring: {
         type: 'object',
         properties: {
@@ -21,41 +22,36 @@ export async function visitRoutes(fastify: FastifyInstance): Promise<void> {
           items: {
             type: 'object',
             properties: {
-              id: { type: 'number' },
-              customerId: { type: 'number' },
+              id:           { type: 'number' },
+              customerId:   { type: 'number' },
               customerName: { type: 'string' },
-              visitedAt: { type: 'string' },
+              visitedAt:    { type: 'string' },
             },
           },
         },
       },
     },
   }, async (request, reply) => {
-    const { limit } = (request.query as { limit?: number });
-    const visits = getRecentVisits(limit ?? 50);
-    return reply.send(visits.map(v => ({
-      id: v.id,
-      customerId: v.customer_id,
+    // limit is always defined — schema default applies when param is absent
+    const { limit } = request.query as { limit: number };
+    return reply.send(getRecentVisits(limit).map(v => ({
+      id:           v.id,
+      customerId:   v.customer_id,
       customerName: v.customer_name,
-      visitedAt: v.visited_at,
+      visitedAt:    v.visited_at,
     })));
   });
 
   fastify.post('/visits', {
     schema: {
-      ...postVisitJsonSchema,
       tags: ['Visits'],
       summary: 'Register a customer visit',
-      description: 'Records a shop visit for an existing customer and plants a tree every X visits.',
+      description: 'Records a shop visit and plants a tree every X visits.',
+      body:     visitBodySchema,
+      response: { 200: visitResponseSchema, 404: errorSchema },
     },
   }, async (request, reply) => {
     const { customerId } = request.body as { customerId: number };
-    const result = processVisit(customerId);
-
-    if (!result) {
-      throw Object.assign(new Error('Customer not found'), { statusCode: 404 });
-    }
-
-    return reply.send(result);
+    return reply.send(processVisit(customerId));
   });
 }

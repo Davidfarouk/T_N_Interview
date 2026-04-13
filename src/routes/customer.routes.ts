@@ -1,27 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { createCustomer, findCustomerById, getVisitCount, getAllCustomers } from '../repositories/customer.repo';
-
-// Single shared schema for every endpoint that returns a customer object
-const customerSchema = {
-  type: 'object',
-  properties: {
-    id:           { type: 'number' },
-    name:         { type: 'string' },
-    totalVisits:  { type: 'number' },
-    treesPlanted: { type: 'number' },
-    lastSeenAt:   { type: 'string', nullable: true },
-    createdAt:    { type: 'string' },
-  },
-};
-
-const errorSchema = {
-  type: 'object',
-  properties: {
-    statusCode: { type: 'number' },
-    error:      { type: 'string' },
-    message:    { type: 'string' },
-  },
-};
+import { customerSchema } from '../schemas/customer.schema';
+import { errorSchema } from '../schemas/error.schema';
 
 export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/customers', {
@@ -35,9 +15,7 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
           name: { type: 'string', minLength: 1, maxLength: 100 },
         },
       },
-      response: {
-        201: customerSchema,
-      },
+      response: { 201: customerSchema },
     },
   }, async (request, reply) => {
     const { name } = request.body as { name: string };
@@ -56,16 +34,10 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
     schema: {
       tags: ['Customers'],
       summary: 'List all customers',
-      response: {
-        200: {
-          type: 'array',
-          items: customerSchema,
-        },
-      },
+      response: { 200: { type: 'array', items: customerSchema } },
     },
   }, async (_request, reply) => {
-    const customers = getAllCustomers();
-    return reply.send(customers.map(c => ({
+    return reply.send(getAllCustomers().map(c => ({
       id:           c.id,
       name:         c.name,
       totalVisits:  c.total_visits,
@@ -82,14 +54,9 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
       params: {
         type: 'object',
         required: ['id'],
-        properties: {
-          id: { type: 'integer' },
-        },
+        properties: { id: { type: 'integer' } },
       },
-      response: {
-        200: customerSchema,
-        404: errorSchema,
-      },
+      response: { 200: customerSchema, 404: errorSchema },
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: number };

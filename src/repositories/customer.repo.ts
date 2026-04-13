@@ -10,17 +10,22 @@ export interface Customer {
 
 export function createCustomer(name: string): Customer {
   const db = getDb();
-  const result = db.prepare('INSERT INTO customers (name) VALUES (?)').run(name);
-  return db.prepare('SELECT * FROM customers WHERE id = ?').get(result.lastInsertRowid) as Customer;
+  const { lastInsertRowid } = db.prepare('INSERT INTO customers (name) VALUES (?)').run(name);
+  return db
+    .prepare('SELECT id, name, trees_planted, last_seen_at, created_at FROM customers WHERE id = ?')
+    .get(lastInsertRowid) as Customer;
 }
 
 export function findCustomerById(id: number): Customer | undefined {
-  return getDb().prepare('SELECT * FROM customers WHERE id = ?').get(id) as Customer | undefined;
+  return getDb()
+    .prepare('SELECT id, name, trees_planted, last_seen_at, created_at FROM customers WHERE id = ?')
+    .get(id) as Customer | undefined;
 }
 
 export function getAllCustomers(): (Customer & { total_visits: number })[] {
   return getDb().prepare(`
-    SELECT c.*, COUNT(v.id) as total_visits
+    SELECT c.id, c.name, c.trees_planted, c.last_seen_at, c.created_at,
+           COUNT(v.id) AS total_visits
     FROM customers c
     LEFT JOIN visits v ON v.customer_id = c.id
     GROUP BY c.id
@@ -38,7 +43,7 @@ export function incrementTreesPlanted(id: number): void {
 
 export function getVisitCount(customerId: number): number {
   const row = getDb()
-    .prepare('SELECT COUNT(*) as count FROM visits WHERE customer_id = ?')
+    .prepare('SELECT COUNT(*) AS count FROM visits WHERE customer_id = ?')
     .get(customerId) as { count: number };
   return row.count;
 }
