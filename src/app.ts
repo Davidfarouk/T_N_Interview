@@ -1,4 +1,4 @@
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import http from 'http';
 import path from 'path';
@@ -13,7 +13,7 @@ export async function buildApp(logger = true): Promise<FastifyInstance> {
 
   // Normalize all errors — both thrown errors and Fastify validation errors —
   // into one consistent shape: { statusCode, error, message }
-  fastify.setErrorHandler((error, _request, reply) => {
+  fastify.setErrorHandler((error: FastifyError, _request, reply) => {
     const statusCode = error.statusCode ?? 500;
     reply.status(statusCode).send({
       statusCode,
