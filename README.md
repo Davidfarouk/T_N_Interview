@@ -29,11 +29,11 @@ graph TB
     subgraph APP["Fastify Server  :3000"]
         STATIC["Static Files\nindex.html"]
 
-        subgraph ROUTES["Routes Layer"]
-            R_V["visit.routes.ts\nPOST /visits · GET /visits"]
-            R_C["customer.routes.ts\nPOST /customers · GET /customers"]
-            R_S["stats.routes.ts\nGET /stats/hourly"]
-            R_CF["config.routes.ts\nGET /config"]
+        subgraph ROUTES["Routes Layer  /v1/..."]
+            R_V["visit.routes.ts\nPOST /v1/visits · GET /v1/visits"]
+            R_C["customer.routes.ts\nPOST /v1/customers · GET /v1/customers"]
+            R_S["stats.routes.ts\nGET /v1/stats/hourly"]
+            R_CF["config.routes.ts\nGET /v1/config"]
         end
 
         subgraph SERVICE["Service Layer"]
@@ -48,7 +48,7 @@ graph TB
 
     DB[("SQLite\ndata/data.db")]
 
-    DEV -->|"POST /visits"| R_V
+    DEV -->|"POST /v1/visits"| R_V
     BROWSER -->|"GET /"| STATIC
     BROWSER -->|"API calls"| ROUTES
 
@@ -64,7 +64,7 @@ graph TB
 
 ### Visit Event Flow
 
-What happens inside the server on every `POST /visits`:
+What happens inside the server on every `POST /v1/visits`:
 
 ```mermaid
 sequenceDiagram
@@ -74,10 +74,10 @@ sequenceDiagram
     participant Repo as repositories
     participant DB as SQLite
 
-    Device->>Route: POST /visits { customerId: 7 }
+    Device->>Route: POST /v1/visits { customerId: 7 }
     Route->>Service: processVisit(7)
     Service->>Repo: findCustomerById(7)
-    Repo->>DB: SELECT * FROM customers WHERE id = 7
+    Repo->>DB: SELECT id, name, ... FROM customers WHERE id = 7
     DB-->>Repo: customer row
     Repo-->>Service: Customer object
 
@@ -91,8 +91,29 @@ sequenceDiagram
     DB-->>Service: totalTrees = 1
     Note over Service,DB: COMMIT
 
-    Service-->>Route: treePlanted: true, totalTrees: 1
-    Route-->>Device: HTTP 200 { success: true, treePlanted: true }
+    Service-->>Route: { treePlanted: true, totalTrees: 1, ... }
+    Route-->>Device: HTTP 200 { treePlanted: true, totalTrees: 1, ... }
+```
+
+### Database Schema
+
+```mermaid
+erDiagram
+    customers {
+        INTEGER id PK
+        TEXT    name
+        INTEGER trees_planted
+        DATETIME last_seen_at
+        DATETIME created_at
+    }
+
+    visits {
+        INTEGER  id PK
+        INTEGER  customer_id FK
+        DATETIME visited_at
+    }
+
+    customers ||--o{ visits : "has many"
 ```
 
 ---
@@ -147,29 +168,47 @@ npm test
 Tests use an in-memory SQLite database — no file is created, nothing persists between runs.
 
 ```
-✓ POST /customers > creates a customer and returns 201
+✓ POST /customers > creates a customer and returns 201 with full customer shape
 ✓ POST /customers > rejects an empty name with 400
 ✓ POST /customers > rejects a missing name with 400
 ✓ GET /customers  > returns an empty array when no customers exist
-✓ GET /customers  > returns all created customers
-✓ POST /visits    > returns 404 when customer does not exist
-✓ POST /visits    > records a visit and returns correct totals
-... (17 tests total)
+✓ GET /customers  > returns all created customers with consistent shape
+✓ GET /customers/:id > returns the customer with full shape including createdAt
+✓ GET /customers/:id > returns 404 with standard error shape for unknown customer
+✓ POST /visits    > returns 404 with standard error shape when customer does not exist
+✓ POST /visits    > records a visit and returns correct totals without success field
+✓ POST /visits    > rejects a missing customerId with 400
+✓ POST /visits    > does not plant a tree before the threshold is reached
+✓ POST /visits    > plants exactly one tree at the configured threshold (3 visits)
+✓ POST /visits    > plants a second tree after 2x the threshold
+✓ POST /visits    > tracks visits independently per customer
+✓ GET /visits     > returns an empty array when no visits exist
+✓ GET /visits     > returns visits with customer name attached
+✓ GET /visits     > returns visits in descending order
+✓ GET /stats/hourly > returns an empty array when no visits exist
+✓ GET /stats/hourly > aggregates visits by hour
+
+Tests: 19 passed
 ```
 
 ---
 
 ## API Reference
 
-Base URL: `http://localhost:3000`
+Base URL: `http://localhost:3000/v1`
 
 Interactive documentation is available at **http://localhost:3000/docs** (Swagger UI).
+
+All error responses share a consistent shape:
+```json
+{ "statusCode": 404, "error": "Not Found", "message": "Customer not found" }
+```
 
 ---
 
 ### Customers
 
-#### `POST /customers`
+#### `POST /v1/customers`
 Create a new customer.
 
 **Request body:**
@@ -179,12 +218,19 @@ Create a new customer.
 
 **Response `201`:**
 ```json
-{ "id": 1, "name": "Alice", "createdAt": "2024-04-13T10:00:00.000Z" }
+{
+  "id": 1,
+  "name": "Alice",
+  "totalVisits": 0,
+  "treesPlanted": 0,
+  "lastSeenAt": null,
+  "createdAt": "2024-04-13T10:00:00.000Z"
+}
 ```
 
 ---
 
-#### `GET /customers`
+#### `GET /v1/customers`
 List all customers with their visit counts and trees planted.
 
 **Response `200`:**
@@ -203,17 +249,21 @@ List all customers with their visit counts and trees planted.
 
 ---
 
-#### `GET /customers/:id`
+#### `GET /v1/customers/:id`
 Get a single customer by ID.
 
-**Response `200`:** Same shape as a single item in `GET /customers`.
-**Response `404`:** `{ "message": "Customer not found", "statusCode": 404 }`
+**Response `200`:** Same shape as a single item from `GET /v1/customers`.
+
+**Response `404`:**
+```json
+{ "statusCode": 404, "error": "Not Found", "message": "Customer not found" }
+```
 
 ---
 
 ### Visits
 
-#### `POST /visits`
+#### `POST /v1/visits`
 Record a shop visit for a customer. This is the endpoint the physical device calls.
 
 **Request body:**
@@ -224,7 +274,6 @@ Record a shop visit for a customer. This is the endpoint the physical device cal
 **Response `200`:**
 ```json
 {
-  "success": true,
   "treePlanted": true,
   "totalVisits": 3,
   "totalTrees": 1,
@@ -232,14 +281,17 @@ Record a shop visit for a customer. This is the endpoint the physical device cal
 }
 ```
 
-**Response `404`:** Customer not found.
+**Response `404`:**
+```json
+{ "statusCode": 404, "error": "Not Found", "message": "Customer not found" }
+```
 
 ---
 
-#### `GET /visits`
-List the 50 most recent visits with customer names.
+#### `GET /v1/visits`
+List the most recent visits with customer names.
 
-**Query params:** `?limit=50` (max 200)
+**Query params:** `?limit=50` (default: 50, max: 200)
 
 **Response `200`:**
 ```json
@@ -257,7 +309,7 @@ List the 50 most recent visits with customer names.
 
 ### Stats
 
-#### `GET /stats/hourly`
+#### `GET /v1/stats/hourly`
 Returns visit counts aggregated by hour, newest first.
 
 **Response `200`:**
@@ -272,7 +324,7 @@ Returns visit counts aggregated by hour, newest first.
 
 ### Config
 
-#### `GET /config`
+#### `GET /v1/config`
 Returns the current runtime configuration.
 
 **Response `200`:**
@@ -284,12 +336,12 @@ Returns the current runtime configuration.
 
 ## Configuration
 
-All settings are controlled via environment variables.
+All settings are controlled via environment variables. Invalid values cause the server to crash on startup with a clear error message.
 
-| Variable         | Default | Description                                  |
-|------------------|---------|----------------------------------------------|
-| `PORT`           | `3000`  | Port the server listens on                   |
-| `VISITS_PER_TREE`| `3`     | How many visits before a tree is planted     |
+| Variable          | Default | Description                              |
+|-------------------|---------|------------------------------------------|
+| `PORT`            | `3000`  | Port the server listens on               |
+| `VISITS_PER_TREE` | `3`     | How many visits before a tree is planted (must be a positive integer) |
 
 Example:
 ```bash
@@ -302,17 +354,33 @@ PORT=8080 VISITS_PER_TREE=5 npm run dev
 
 ```
 src/
-├── config/         # Environment variable parsing
-├── db/             # Database connection and migrations
-├── frontend/       # Single-page dashboard (HTML/CSS/JS)
-├── plugins/        # Swagger documentation setup
-├── repositories/   # All SQL queries — the only layer that touches the DB
-├── routes/         # HTTP endpoint definitions
-├── schemas/        # Request/response shape validation
-├── services/       # Business logic (tree-planting rules)
-├── tests/          # Integration tests
-├── app.ts          # Builds the Fastify server (used by both server and tests)
-└── server.ts       # Entry point — starts the server
+├── config/
+│   └── env.ts              # Environment variable parsing and validation
+├── db/
+│   ├── database.ts         # SQLite connection, withTransaction helper
+│   └── migrations.ts       # Table definitions (runs on startup)
+├── frontend/
+│   └── index.html          # Single-page dashboard (HTML + CSS + JS)
+├── plugins/
+│   └── swagger.ts          # Swagger / OpenAPI documentation setup
+├── repositories/           # The only layer that writes SQL
+│   ├── customer.repo.ts
+│   └── visit.repo.ts
+├── routes/                 # HTTP endpoint definitions (thin — no business logic)
+│   ├── config.routes.ts
+│   ├── customer.routes.ts
+│   ├── stats.routes.ts
+│   └── visit.routes.ts
+├── schemas/                # Request and response shape definitions
+│   ├── customer.schema.ts
+│   ├── error.schema.ts
+│   └── visit.schema.ts
+├── services/
+│   └── visit.service.ts    # Business logic: X visits = 1 tree, transaction handling
+├── tests/
+│   └── app.test.ts         # 19 integration tests (in-memory DB, no server started)
+├── app.ts                  # Builds the Fastify app (shared by server and tests)
+└── server.ts               # Entry point — calls buildApp() then listens on a port
 ```
 
 Each layer has one job. Routes handle HTTP. Services handle business rules. Repositories handle SQL. Nothing crosses those boundaries. See the [Architecture](#architecture) diagrams above for the full picture.
@@ -321,7 +389,7 @@ Each layer has one job. Routes handle HTTP. Services handle business rules. Repo
 
 ## Assumptions
 
-- **Customer identity is pre-known.** The physical device sends a `customerId` that already exists in the system. Customer registration is a separate flow handled via `POST /customers`.
+- **Customer identity is pre-known.** The physical device sends a `customerId` that already exists in the system. Customer registration is a separate flow handled via `POST /v1/customers`.
 - **Visit = entry only.** The device fires one event when the customer walks in. There is no check-out concept — duration is not tracked.
 - **One shop.** The system is designed for a single shop. Multi-location support would require adding a `shopId` to visits.
 - **Visits are always legitimate.** No deduplication is applied (e.g. a customer who walks in and out twice in a minute gets two visits). The physical device is assumed to handle this logic.
@@ -333,9 +401,11 @@ Each layer has one job. Routes handle HTTP. Services handle business rules. Repo
 
 | Decision | Rationale |
 |---|---|
-| **Fastify** over Express | Faster, built-in schema validation via JSON Schema, native TypeScript support, Swagger integration with zero extra work |
+| **Fastify** over Express | Faster, built-in JSON Schema validation, native TypeScript support, Swagger integration with zero extra work |
 | **SQLite** over PostgreSQL | Zero infrastructure setup, embedded in the process, sufficient for the scale described, WAL mode handles concurrent reads |
 | **better-sqlite3** over node-sqlite3 | Synchronous API is simpler and faster for single-writer SQLite use cases |
 | **Repository pattern** | All SQL is isolated in `repositories/`. Swapping the database only requires changing those files |
+| **`withTransaction` helper** | The service layer runs atomic operations without importing the raw database — keeps business logic clean |
 | **Transactions in visit processing** | Recording a visit and planting a tree are one atomic operation — if the server crashes mid-way, the data stays consistent |
-| **Vanilla JS frontend** | The spec asks for "a simple frontend". No framework overhead, no build step, zero dependencies |
+| **`app.ts` / `server.ts` split** | `buildApp()` constructs the server without starting it, allowing tests to use `.inject()` without opening a real port |
+| **Vanilla JS frontend** | The spec asks for "a simple frontend" — no framework overhead, no build step, zero dependencies |
