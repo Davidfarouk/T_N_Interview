@@ -10,18 +10,18 @@ export const postVisitJsonSchema = {
     200: {
       type: 'object',
       properties: {
-        success: { type: 'boolean' },
-        treePlanted: { type: 'boolean' },
-        totalVisits: { type: 'number' },
-        totalTrees: { type: 'number' },
-        visitsUntilNextTree: { type: 'number' },
+        treePlanted:          { type: 'boolean' },
+        totalVisits:          { type: 'number' },
+        totalTrees:           { type: 'number' },
+        visitsUntilNextTree:  { type: 'number' },
       },
     },
     404: {
       type: 'object',
       properties: {
-        message: { type: 'string' },
         statusCode: { type: 'number' },
+        error:      { type: 'string' },
+        message:    { type: 'string' },
       },
     },
   },

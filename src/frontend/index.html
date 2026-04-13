@@ -451,7 +451,7 @@
     const name = input.value.trim();
     if (!name) { showToast('toast-customer', 'Name is required', 'err'); return; }
     try {
-      const res = await fetch('/customers', {
+      const res = await fetch('/v1/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -473,7 +473,7 @@
     if (!customerId) { showToast('toast', 'Select a customer first', 'err'); return; }
     const customerName = select.options[select.selectedIndex].text;
     try {
-      const res = await fetch('/visits', {
+      const res = await fetch('/v1/visits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customerId }),
@@ -545,7 +545,7 @@
   async function loadStats() {
     const wrap = document.getElementById('chart-wrap');
     try {
-      const res = await fetch('/stats/hourly');
+      const res = await fetch('/v1/stats/hourly');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -600,7 +600,7 @@
   async function loadVisits() {
     const tbody = document.getElementById('visits-body');
     try {
-      const res = await fetch('/visits?limit=50');
+      const res = await fetch('/v1/visits?limit=50');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -645,7 +645,7 @@
   // ── INIT ──
   async function loadConfig() {
     try {
-      const data = await fetch('/config').then(r => r.json());
+      const data = await fetch('/v1/config').then(r => r.json());
       VISITS_PER_TREE = data.visitsPerTree;
       document.getElementById('nav-x').textContent = VISITS_PER_TREE;
     } catch (_) {}

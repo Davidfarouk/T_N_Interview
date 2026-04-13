@@ -53,9 +53,9 @@ export async function visitRoutes(fastify: FastifyInstance): Promise<void> {
     const result = processVisit(customerId);
 
     if (!result) {
-      return reply.status(404).send({ message: 'Customer not found', statusCode: 404 });
+      throw Object.assign(new Error('Customer not found'), { statusCode: 404 });
     }
 
-    return reply.send({ success: true, ...result });
+    return reply.send(result);
   });
 }

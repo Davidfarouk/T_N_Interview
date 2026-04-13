@@ -1,6 +1,28 @@
 import { FastifyInstance } from 'fastify';
 import { createCustomer, findCustomerById, getVisitCount, getAllCustomers } from '../repositories/customer.repo';
 
+// Single shared schema for every endpoint that returns a customer object
+const customerSchema = {
+  type: 'object',
+  properties: {
+    id:           { type: 'number' },
+    name:         { type: 'string' },
+    totalVisits:  { type: 'number' },
+    treesPlanted: { type: 'number' },
+    lastSeenAt:   { type: 'string', nullable: true },
+    createdAt:    { type: 'string' },
+  },
+};
+
+const errorSchema = {
+  type: 'object',
+  properties: {
+    statusCode: { type: 'number' },
+    error:      { type: 'string' },
+    message:    { type: 'string' },
+  },
+};
+
 export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/customers', {
     schema: {
@@ -10,24 +32,24 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
         type: 'object',
         required: ['name'],
         properties: {
-          name: { type: 'string', minLength: 1 },
+          name: { type: 'string', minLength: 1, maxLength: 100 },
         },
       },
       response: {
-        201: {
-          type: 'object',
-          properties: {
-            id: { type: 'number' },
-            name: { type: 'string' },
-            createdAt: { type: 'string' },
-          },
-        },
+        201: customerSchema,
       },
     },
   }, async (request, reply) => {
     const { name } = request.body as { name: string };
     const customer = createCustomer(name);
-    return reply.status(201).send({ id: customer.id, name: customer.name, createdAt: customer.created_at });
+    return reply.status(201).send({
+      id:           customer.id,
+      name:         customer.name,
+      totalVisits:  0,
+      treesPlanted: 0,
+      lastSeenAt:   null,
+      createdAt:    customer.created_at,
+    });
   });
 
   fastify.get('/customers', {
@@ -37,29 +59,19 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
       response: {
         200: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'number' },
-              name: { type: 'string' },
-              totalVisits: { type: 'number' },
-              treesPlanted: { type: 'number' },
-              lastSeenAt: { type: 'string', nullable: true },
-              createdAt: { type: 'string' },
-            },
-          },
+          items: customerSchema,
         },
       },
     },
   }, async (_request, reply) => {
     const customers = getAllCustomers();
     return reply.send(customers.map(c => ({
-      id: c.id,
-      name: c.name,
-      totalVisits: c.total_visits,
+      id:           c.id,
+      name:         c.name,
+      totalVisits:  c.total_visits,
       treesPlanted: c.trees_planted,
-      lastSeenAt: c.last_seen_at,
-      createdAt: c.created_at,
+      lastSeenAt:   c.last_seen_at,
+      createdAt:    c.created_at,
     })));
   });
 
@@ -75,23 +87,8 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
         },
       },
       response: {
-        200: {
-          type: 'object',
-          properties: {
-            id: { type: 'number' },
-            name: { type: 'string' },
-            totalVisits: { type: 'number' },
-            treesPlanted: { type: 'number' },
-            lastSeenAt: { type: 'string', nullable: true },
-          },
-        },
-        404: {
-          type: 'object',
-          properties: {
-            message: { type: 'string' },
-            statusCode: { type: 'number' },
-          },
-        },
+        200: customerSchema,
+        404: errorSchema,
       },
     },
   }, async (request, reply) => {
@@ -99,15 +96,16 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
     const customer = findCustomerById(id);
 
     if (!customer) {
-      return reply.status(404).send({ message: 'Customer not found', statusCode: 404 });
+      throw Object.assign(new Error('Customer not found'), { statusCode: 404 });
     }
 
     return reply.send({
-      id: customer.id,
-      name: customer.name,
-      totalVisits: getVisitCount(id),
+      id:           customer.id,
+      name:         customer.name,
+      totalVisits:  getVisitCount(id),
       treesPlanted: customer.trees_planted,
-      lastSeenAt: customer.last_seen_at,
+      lastSeenAt:   customer.last_seen_at,
+      createdAt:    customer.created_at,
     });
   });
 }
