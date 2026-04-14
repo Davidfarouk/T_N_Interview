@@ -497,7 +497,7 @@
   async function loadCustomers() {
     const tbody = document.getElementById('customers-body');
     try {
-      const res = await fetch('/customers');
+      const res = await fetch('/v1/customers');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
