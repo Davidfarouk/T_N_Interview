@@ -62,39 +62,6 @@ graph TB
     VREPO --> DB
 ```
 
-### Visit Event Flow
-
-What happens inside the server on every `POST /v1/visits`:
-
-```mermaid
-sequenceDiagram
-    participant Device as Physical Device
-    participant Route as visit.routes.ts
-    participant Service as visit.service.ts
-    participant Repo as repositories
-    participant DB as SQLite
-
-    Device->>Route: POST /v1/visits { customerId: 7 }
-    Route->>Service: processVisit(7)
-    Service->>Repo: findCustomerById(7)
-    Repo->>DB: SELECT id, name, ... FROM customers WHERE id = 7
-    DB-->>Repo: customer row
-    Repo-->>Service: Customer object
-
-    Note over Service,DB: BEGIN TRANSACTION
-    Service->>Repo: updateLastSeen(7)
-    Service->>Repo: insertVisit(7)
-    Service->>Repo: getVisitCount(7)
-    DB-->>Service: totalVisits = 3
-    Service->>Repo: incrementTreesPlanted(7)
-    Service->>Repo: getTreesPlanted(7)
-    DB-->>Service: totalTrees = 1
-    Note over Service,DB: COMMIT
-
-    Service-->>Route: { treePlanted: true, totalTrees: 1, ... }
-    Route-->>Device: HTTP 200 { treePlanted: true, totalTrees: 1, ... }
-```
-
 ### Database Schema
 
 ```mermaid
