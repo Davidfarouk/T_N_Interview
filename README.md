@@ -20,46 +20,47 @@ A physical device at the shop entrance detects when a customer walks in and send
 ### System Overview
 
 ```mermaid
-graph TB
-    subgraph Clients["External Clients"]
-        DEV["Physical Device\nshop entrance sensor"]
-        BROWSER["Browser\nlive dashboard"]
-    end
+graph LR
+    DEV["Physical Device\nshop entrance sensor"]
+    BROWSER["Browser\nlive dashboard"]
 
-    subgraph APP["Fastify Server  :3000"]
+    subgraph APP["Fastify Server — port 3000"]
+        direction LR
         STATIC["Static Files\nindex.html"]
 
-        subgraph ROUTES["Routes Layer  /v1/..."]
-            R_V["visit.routes.ts\nPOST /v1/visits · GET /v1/visits"]
-            R_C["customer.routes.ts\nPOST /v1/customers · GET /v1/customers"]
+        subgraph ROUTES["Routes  /v1/"]
+            direction TB
+            R_V["visit.routes.ts\nPOST · GET /v1/visits"]
+            R_C["customer.routes.ts\nPOST · GET /v1/customers"]
             R_S["stats.routes.ts\nGET /v1/stats/hourly"]
             R_CF["config.routes.ts\nGET /v1/config"]
         end
 
-        subgraph SERVICE["Service Layer"]
-            SVC["visit.service.ts\nX visits = 1 tree rule\natomic transaction"]
+        subgraph SERVICE["Service"]
+            SVC["visit.service.ts\nX visits = 1 tree\natomic transaction"]
         end
 
-        subgraph REPO["Repository Layer"]
-            CREPO["customer.repo.ts\nread · write customers"]
-            VREPO["visit.repo.ts\ninsert · aggregate visits"]
+        subgraph REPO["Repositories"]
+            direction TB
+            CREPO["customer.repo.ts"]
+            VREPO["visit.repo.ts"]
         end
     end
 
     DB[("SQLite\ndata/data.db")]
 
-    DEV -.->|"POST /v1/visits"| R_V
-    BROWSER -.->|"GET /"| STATIC
-    BROWSER -.->|"API calls"| ROUTES
+    DEV --> R_V
+    BROWSER --> STATIC
+    BROWSER --> ROUTES
 
-    R_V -.-> SVC
-    SVC -.-> CREPO
-    SVC -.-> VREPO
-    R_C -.-> CREPO
-    R_S -.-> VREPO
+    R_V --> SVC
+    SVC --> CREPO
+    SVC --> VREPO
+    R_C --> CREPO
+    R_S --> VREPO
 
-    CREPO -.-> DB
-    VREPO -.-> DB
+    CREPO --> DB
+    VREPO --> DB
 ```
 
 ### Database Schema
@@ -80,7 +81,7 @@ erDiagram
         DATETIME visited_at
     }
 
-    customers ||--o{ visits : " "
+    customers ||--o{ visits : "visits"
 ```
 
 ---
