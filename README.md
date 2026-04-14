@@ -48,18 +48,18 @@ graph TB
 
     DB[("SQLite\ndata/data.db")]
 
-    DEV -->|"POST /v1/visits"| R_V
-    BROWSER -->|"GET /"| STATIC
-    BROWSER -->|"API calls"| ROUTES
+    DEV -.->|"POST /v1/visits"| R_V
+    BROWSER -.->|"GET /"| STATIC
+    BROWSER -.->|"API calls"| ROUTES
 
-    R_V --> SVC
-    SVC --> CREPO
-    SVC --> VREPO
-    R_C --> CREPO
-    R_S --> VREPO
+    R_V -.-> SVC
+    SVC -.-> CREPO
+    SVC -.-> VREPO
+    R_C -.-> CREPO
+    R_S -.-> VREPO
 
-    CREPO --> DB
-    VREPO --> DB
+    CREPO -.-> DB
+    VREPO -.-> DB
 ```
 
 ### Database Schema
@@ -80,7 +80,7 @@ erDiagram
         DATETIME visited_at
     }
 
-    customers ||--o{ visits : "has many"
+    customers ||--o{ visits : " "
 ```
 
 ---
@@ -134,74 +134,38 @@ npm test
 
 Tests use an in-memory SQLite database — no file is created, nothing persists between runs. Each test gets a completely fresh database via `setDb()` injecting a new `:memory:` instance before every test. The real Fastify app is built with `buildApp()` and requests are fired using `.inject()` — no server port is opened.
 
----
+19 integration tests across 6 suites:
 
-## Test Cases
+**`POST /v1/customers`**
+- ✓ Creates a customer and returns 201 with full customer shape
+- ✓ Rejects an empty name with 400
+- ✓ Rejects a missing name with 400
 
-19 integration tests across 6 suites. Every suite spins up the full app stack against an isolated in-memory database.
+**`GET /v1/customers`**
+- ✓ Returns an empty array when no customers exist
+- ✓ Returns all created customers with consistent shape
 
----
+**`GET /v1/customers/:id`**
+- ✓ Returns the customer with full shape including `createdAt`
+- ✓ Returns 404 with standard error shape for unknown customer
 
-### `POST /v1/customers` — 3 tests
+**`POST /v1/visits`**
+- ✓ Returns 404 with standard error shape when customer does not exist
+- ✓ Records a visit and returns correct totals
+- ✓ Rejects a missing `customerId` with 400
+- ✓ Does not plant a tree before the threshold is reached
+- ✓ Plants exactly one tree at the configured threshold (3 visits)
+- ✓ Plants a second tree after 2× the threshold
+- ✓ Tracks visits independently per customer
 
-| Test | What it verifies |
-|---|---|
-| Creates a customer and returns 201 with full customer shape | Response has status 201 and returns all 6 fields: `id`, `name`, `totalVisits: 0`, `treesPlanted: 0`, `lastSeenAt: null`, `createdAt` |
-| Rejects an empty name with 400 | Schema validation blocks `name: ""` before the handler runs — returns standard error shape |
-| Rejects a missing name with 400 | Schema validation blocks a body with no `name` field — returns standard error shape |
+**`GET /v1/visits`**
+- ✓ Returns an empty array when no visits exist
+- ✓ Returns visits with customer name attached
+- ✓ Returns visits in descending order
 
----
-
-### `GET /v1/customers` — 2 tests
-
-| Test | What it verifies |
-|---|---|
-| Returns an empty array when no customers exist | Fresh database returns `[]`, not null or an error |
-| Returns all created customers with consistent shape | Every item in the array contains all 6 customer fields — confirms the unified shape is enforced at the list level too |
-
----
-
-### `GET /v1/customers/:id` — 2 tests
-
-| Test | What it verifies |
-|---|---|
-| Returns the customer with full shape including `createdAt` | Single customer lookup returns all 6 fields including `createdAt` (which was previously missing from this endpoint) |
-| Returns 404 with standard error shape for unknown customer | Unknown ID returns `{ statusCode: 404, error: "Not Found", message: "Customer not found" }` — confirms the global error handler is normalizing errors |
-
----
-
-### `POST /v1/visits` — 6 tests
-
-This is the most important suite — it covers the core business rule.
-
-| Test | What it verifies |
-|---|---|
-| Returns 404 with standard error shape when customer does not exist | Sending a visit for a non-existent customer throws from the service layer and returns the correct error shape |
-| Records a visit and returns correct totals without `success` field | First visit returns `totalVisits: 1`, `treePlanted: false`, and confirms the removed `success` field is absent |
-| Rejects a missing `customerId` with 400 | Schema validation blocks an empty body |
-| Does not plant a tree before the threshold is reached | Visits 1 and 2 both return `treePlanted: false` when threshold is 3 |
-| Plants exactly one tree at the configured threshold (3 visits) | The 3rd visit returns `treePlanted: true`, `totalTrees: 1`, `totalVisits: 3` — the core X visits = 1 tree rule |
-| Plants a second tree after 2× the threshold | The 6th visit returns `treePlanted: true`, `totalTrees: 2` — confirms the rule repeats correctly |
-| Tracks visits independently per customer | Alice reaching 3 visits does not affect Bob's counter — customer isolation is enforced |
-
----
-
-### `GET /v1/visits` — 3 tests
-
-| Test | What it verifies |
-|---|---|
-| Returns an empty array when no visits exist | Fresh database returns `[]` |
-| Returns visits with customer name attached | Response includes `customerName` from the JOIN — not just the raw `customer_id` |
-| Returns visits in descending order | Most recent visit (`highest id`) comes first — the `ORDER BY visited_at DESC, id DESC` sort is correct |
-
----
-
-### `GET /v1/stats/hourly` — 2 tests
-
-| Test | What it verifies |
-|---|---|
-| Returns an empty array when no visits exist | Fresh database returns `[]` |
-| Aggregates visits by hour | Two visits in the same hour produce one row with `visits: 2` — the `GROUP BY` aggregation is working |
+**`GET /v1/stats/hourly`**
+- ✓ Returns an empty array when no visits exist
+- ✓ Aggregates visits by hour
 
 ---
 
