@@ -20,28 +20,27 @@ A physical device at the shop entrance detects when a customer walks in and send
 ### System Overview
 
 ```mermaid
-graph LR
-    DEV["Physical Device\nshop entrance sensor"]
-    BROWSER["Browser\nlive dashboard"]
+graph TB
+    subgraph Clients["External Clients"]
+        DEV["Physical Device\nentrance sensor"]
+        BROWSER["Browser\nlive dashboard"]
+    end
 
     subgraph APP["Fastify Server — port 3000"]
-        direction LR
         STATIC["Static Files\nindex.html"]
 
-        subgraph ROUTES["Routes  /v1/"]
-            direction TB
+        subgraph ROUTES["Routes Layer  /v1/"]
             R_V["visit.routes.ts\nPOST · GET /v1/visits"]
             R_C["customer.routes.ts\nPOST · GET /v1/customers"]
             R_S["stats.routes.ts\nGET /v1/stats/hourly"]
             R_CF["config.routes.ts\nGET /v1/config"]
         end
 
-        subgraph SERVICE["Service"]
-            SVC["visit.service.ts\nX visits = 1 tree\natomic transaction"]
+        subgraph SERVICE["Service Layer"]
+            SVC["visit.service.ts\nX visits = 1 tree · atomic"]
         end
 
-        subgraph REPO["Repositories"]
-            direction TB
+        subgraph REPO["Repository Layer"]
             CREPO["customer.repo.ts"]
             VREPO["visit.repo.ts"]
         end
@@ -49,18 +48,16 @@ graph LR
 
     DB[("SQLite\ndata/data.db")]
 
-    DEV --> R_V
-    BROWSER --> STATIC
-    BROWSER --> ROUTES
+    DEV -->|"POST /v1/visits"| R_V
+    BROWSER -->|"GET /"| STATIC
+    BROWSER --> R_C & R_S & R_CF
 
     R_V --> SVC
-    SVC --> CREPO
-    SVC --> VREPO
+    SVC --> CREPO & VREPO
     R_C --> CREPO
     R_S --> VREPO
 
-    CREPO --> DB
-    VREPO --> DB
+    CREPO & VREPO --> DB
 ```
 
 ### Database Schema
