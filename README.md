@@ -37,7 +37,9 @@ graph TB
         end
 
         subgraph SERVICE["Service Layer"]
-            SVC["visit.service.ts\nX visits = 1 tree · atomic"]
+            SVC_V["visit.service.ts\nX visits = 1 tree · atomic"]
+            SVC_C["customer.service.ts\ncreate · list · getById"]
+            SVC_S["stats.service.ts\nhourly aggregation"]
         end
 
         subgraph REPO["Repository Layer"]
@@ -52,10 +54,12 @@ graph TB
     BROWSER -->|"GET /"| STATIC
     BROWSER --> R_C & R_S & R_CF
 
-    R_V --> SVC
-    SVC --> CREPO & VREPO
-    R_C --> CREPO
-    R_S --> VREPO
+    R_V --> SVC_V
+    SVC_V --> CREPO & VREPO
+    R_C --> SVC_C
+    SVC_C --> CREPO
+    R_S --> SVC_S
+    SVC_S --> VREPO
 
     CREPO & VREPO --> DB
 ```
@@ -130,7 +134,7 @@ npm start       # runs the compiled output
 npm test
 ```
 
-Tests use an in-memory SQLite database — no file is created, nothing persists between runs. Each test gets a completely fresh database via `setDb()` injecting a new `:memory:` instance before every test. The real Fastify app is built with `buildApp()` and requests are fired using `.inject()` — no server port is opened.
+Tests use an in-memory SQLite database — no file is created, nothing persists between runs. Each test gets a completely fresh database injected via `buildApp(false, makeTestDb())`. The real Fastify app is built with `buildApp()` and requests are fired using `.inject()` — no server port is opened.
 
 19 integration tests across 6 suites:
 
@@ -331,15 +335,18 @@ src/
 ├── config/
 │   └── env.ts              # Environment variable parsing and validation
 ├── db/
-│   ├── database.ts         # SQLite connection, withTransaction helper
+│   ├── database.ts         # SQLite connection singleton (production)
 │   └── migrations.ts       # Table definitions (runs on startup)
+├── errors/
+│   └── domain.ts           # Domain error classes (NotFoundError)
 ├── frontend/
 │   └── index.html          # Single-page dashboard (HTML + CSS + JS)
 ├── plugins/
 │   └── swagger.ts          # Swagger / OpenAPI documentation setup
 ├── repositories/           # The only layer that writes SQL
-│   ├── customer.repo.ts
-│   └── visit.repo.ts
+│   ├── interfaces.ts       # ICustomerRepository, IVisitRepository contracts
+│   ├── customer.repo.ts    # CustomerRepository implements ICustomerRepository
+│   └── visit.repo.ts       # VisitRepository implements IVisitRepository
 ├── routes/                 # HTTP endpoint definitions (thin — no business logic)
 │   ├── config.routes.ts
 │   ├── customer.routes.ts
@@ -350,7 +357,9 @@ src/
 │   ├── error.schema.ts
 │   └── visit.schema.ts
 ├── services/
-│   └── visit.service.ts    # Business logic: X visits = 1 tree, transaction handling
+│   ├── customer.service.ts # create, list, getById — used by all customer routes
+│   ├── stats.service.ts    # hourly aggregation — used by stats routes
+│   └── visit.service.ts    # X visits = 1 tree, atomic transaction handling
 ├── tests/
 │   └── app.test.ts         # 19 integration tests (in-memory DB, no server started)
 ├── app.ts                  # Builds the Fastify app (shared by server and tests)
@@ -379,7 +388,8 @@ Each layer has one job. Routes handle HTTP. Services handle business rules. Repo
 | **SQLite** over PostgreSQL | Zero infrastructure setup, embedded in the process, sufficient for the scale described, WAL mode handles concurrent reads |
 | **better-sqlite3** over node-sqlite3 | Synchronous API is simpler and faster for single-writer SQLite use cases |
 | **Repository pattern** | All SQL is isolated in `repositories/`. Swapping the database only requires changing those files |
-| **`withTransaction` helper** | The service layer runs atomic operations without importing the raw database — keeps business logic clean |
+| **Injected `TransactionRunner`** | `VisitService` receives a `<T>(fn: () => T) => T` function rather than importing SQLite directly — business logic is DB-agnostic and swappable |
 | **Transactions in visit processing** | Recording a visit and planting a tree are one atomic operation — if the server crashes mid-way, the data stays consistent |
+| **Constructor injection via `buildApp`** | Repositories and services are wired once in `buildApp()`; tests pass an in-memory DB without any module-level seam |
 | **`app.ts` / `server.ts` split** | `buildApp()` constructs the server without starting it, allowing tests to use `.inject()` without opening a real port |
 | **Vanilla JS frontend** | The spec asks for "a simple frontend" — no framework overhead, no build step, zero dependencies |
