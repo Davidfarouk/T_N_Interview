@@ -1,13 +1,7 @@
 import { config } from '../config/env';
-import { withTransaction } from '../db/database';
-import {
-  findCustomerById,
-  updateLastSeen,
-  incrementTreesPlanted,
-  getVisitCount,
-  getTreesPlanted,
-} from '../repositories/customer.repo';
-import { insertVisit } from '../repositories/visit.repo';
+import { NotFoundError } from '../errors/domain';
+import type { ICustomerRepository, IVisitRepository } from '../repositories/interfaces';
+import type { RecentVisit } from '../repositories/visit.repo';
 
 export interface VisitResult {
   treePlanted: boolean;
@@ -16,27 +10,41 @@ export interface VisitResult {
   visitsUntilNextTree: number;
 }
 
-export function processVisit(customerId: number): VisitResult {
-  const customer = findCustomerById(customerId);
+type TransactionRunner = <T>(fn: () => T) => T;
 
-  if (!customer) {
-    throw Object.assign(new Error('Customer not found'), { statusCode: 404 });
+export class VisitService {
+  constructor(
+    private customerRepo: ICustomerRepository,
+    private visitRepo: IVisitRepository,
+    private runInTransaction: TransactionRunner,
+  ) {}
+
+  processVisit(customerId: number): VisitResult {
+    const customer = this.customerRepo.findById(customerId);
+
+    if (!customer) {
+      throw new NotFoundError('Customer not found');
+    }
+
+    return this.runInTransaction((): VisitResult => {
+      this.customerRepo.updateLastSeen(customerId);
+      this.visitRepo.insert(customerId);
+
+      const totalVisits = this.customerRepo.getVisitCount(customerId);
+      const treePlanted = totalVisits % config.VISITS_PER_TREE === 0;
+
+      if (treePlanted) this.customerRepo.incrementTreesPlanted(customerId);
+
+      return {
+        treePlanted,
+        totalVisits,
+        totalTrees:          this.customerRepo.getTreesPlanted(customerId),
+        visitsUntilNextTree: config.VISITS_PER_TREE - (totalVisits % config.VISITS_PER_TREE),
+      };
+    });
   }
 
-  return withTransaction((): VisitResult => {
-    updateLastSeen(customerId);
-    insertVisit(customerId);
-
-    const totalVisits = getVisitCount(customerId);
-    const treePlanted = totalVisits % config.VISITS_PER_TREE === 0;
-
-    if (treePlanted) incrementTreesPlanted(customerId);
-
-    return {
-      treePlanted,
-      totalVisits,
-      totalTrees:          getTreesPlanted(customerId),
-      visitsUntilNextTree: config.VISITS_PER_TREE - (totalVisits % config.VISITS_PER_TREE),
-    };
-  });
+  listRecent(limit: number): RecentVisit[] {
+    return this.visitRepo.getRecent(limit);
+  }
 }

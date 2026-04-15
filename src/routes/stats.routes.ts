@@ -1,7 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { getHourlyVisits } from '../repositories/visit.repo';
+import { StatsService } from '../services/stats.service';
 
-export async function statsRoutes(fastify: FastifyInstance): Promise<void> {
+export async function statsRoutes(
+  fastify: FastifyInstance,
+  opts: { statsService: StatsService },
+): Promise<void> {
+  const { statsService } = opts;
+
   fastify.get('/stats/hourly', {
     schema: {
       tags: ['Stats'],
@@ -21,6 +26,6 @@ export async function statsRoutes(fastify: FastifyInstance): Promise<void> {
       },
     },
   }, async (_request, reply) => {
-    return reply.send(getHourlyVisits());
+    return reply.send(statsService.getHourly());
   });
 }

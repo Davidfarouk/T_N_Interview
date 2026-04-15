@@ -1,9 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import { createCustomer, findCustomerById, getVisitCount, getAllCustomers } from '../repositories/customer.repo';
+import { CustomerService } from '../services/customer.service';
 import { customerSchema } from '../schemas/customer.schema';
 import { errorSchema } from '../schemas/error.schema';
 
-export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
+export async function customerRoutes(
+  fastify: FastifyInstance,
+  opts: { customerService: CustomerService },
+): Promise<void> {
+  const { customerService } = opts;
+
   fastify.post('/customers', {
     schema: {
       tags: ['Customers'],
@@ -19,15 +24,7 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
     },
   }, async (request, reply) => {
     const { name } = request.body as { name: string };
-    const customer = createCustomer(name);
-    return reply.status(201).send({
-      id:           customer.id,
-      name:         customer.name,
-      totalVisits:  0,
-      treesPlanted: 0,
-      lastSeenAt:   null,
-      createdAt:    customer.created_at,
-    });
+    return reply.status(201).send(customerService.create(name));
   });
 
   fastify.get('/customers', {
@@ -37,14 +34,7 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
       response: { 200: { type: 'array', items: customerSchema } },
     },
   }, async (_request, reply) => {
-    return reply.send(getAllCustomers().map(c => ({
-      id:           c.id,
-      name:         c.name,
-      totalVisits:  c.total_visits,
-      treesPlanted: c.trees_planted,
-      lastSeenAt:   c.last_seen_at,
-      createdAt:    c.created_at,
-    })));
+    return reply.send(customerService.list());
   });
 
   fastify.get('/customers/:id', {
@@ -60,19 +50,6 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: number };
-    const customer = findCustomerById(id);
-
-    if (!customer) {
-      throw Object.assign(new Error('Customer not found'), { statusCode: 404 });
-    }
-
-    return reply.send({
-      id:           customer.id,
-      name:         customer.name,
-      totalVisits:  getVisitCount(id),
-      treesPlanted: customer.trees_planted,
-      lastSeenAt:   customer.last_seen_at,
-      createdAt:    customer.created_at,
-    });
+    return reply.send(customerService.getById(id));
   });
 }

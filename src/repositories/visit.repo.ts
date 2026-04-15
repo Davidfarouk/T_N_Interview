@@ -1,4 +1,5 @@
-import { getDb } from '../db/database';
+import Database from 'better-sqlite3';
+import type { IVisitRepository } from './interfaces';
 
 export interface HourlyVisit {
   hour: string;
@@ -12,27 +13,31 @@ export interface RecentVisit {
   visited_at: string;
 }
 
-export function insertVisit(customerId: number): void {
-  getDb().prepare('INSERT INTO visits (customer_id) VALUES (?)').run(customerId);
-}
+export class VisitRepository implements IVisitRepository {
+  constructor(private db: Database.Database) {}
 
-export function getRecentVisits(limit = 50): RecentVisit[] {
-  return getDb().prepare(`
-    SELECT v.id, v.customer_id, c.name AS customer_name, v.visited_at
-    FROM visits v
-    JOIN customers c ON c.id = v.customer_id
-    ORDER BY v.visited_at DESC, v.id DESC
-    LIMIT ?
-  `).all(limit) as RecentVisit[];
-}
+  insert(customerId: number): void {
+    this.db.prepare('INSERT INTO visits (customer_id) VALUES (?)').run(customerId);
+  }
 
-export function getHourlyVisits(): HourlyVisit[] {
-  return getDb().prepare(`
-    SELECT
-      strftime('%Y-%m-%d %H:00', visited_at) AS hour,
-      COUNT(*) AS visits
-    FROM visits
-    GROUP BY hour
-    ORDER BY hour DESC
-  `).all() as HourlyVisit[];
+  getRecent(limit = 50): RecentVisit[] {
+    return this.db.prepare(`
+      SELECT v.id, v.customer_id, c.name AS customer_name, v.visited_at
+      FROM visits v
+      JOIN customers c ON c.id = v.customer_id
+      ORDER BY v.visited_at DESC, v.id DESC
+      LIMIT ?
+    `).all(limit) as RecentVisit[];
+  }
+
+  getHourly(): HourlyVisit[] {
+    return this.db.prepare(`
+      SELECT
+        strftime('%Y-%m-%d %H:00', visited_at) AS hour,
+        COUNT(*) AS visits
+      FROM visits
+      GROUP BY hour
+      ORDER BY hour DESC
+    `).all() as HourlyVisit[];
+  }
 }

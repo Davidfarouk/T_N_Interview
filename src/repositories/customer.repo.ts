@@ -1,4 +1,5 @@
-import { getDb } from '../db/database';
+import Database from 'better-sqlite3';
+import type { ICustomerRepository } from './interfaces';
 
 export interface Customer {
   id: number;
@@ -8,49 +9,52 @@ export interface Customer {
   created_at: string;
 }
 
-export function createCustomer(name: string): Customer {
-  const db = getDb();
-  const { lastInsertRowid } = db.prepare('INSERT INTO customers (name) VALUES (?)').run(name);
-  return db
-    .prepare('SELECT id, name, trees_planted, last_seen_at, created_at FROM customers WHERE id = ?')
-    .get(lastInsertRowid) as Customer;
-}
+export class CustomerRepository implements ICustomerRepository {
+  constructor(private db: Database.Database) {}
 
-export function findCustomerById(id: number): Customer | undefined {
-  return getDb()
-    .prepare('SELECT id, name, trees_planted, last_seen_at, created_at FROM customers WHERE id = ?')
-    .get(id) as Customer | undefined;
-}
+  create(name: string): Customer {
+    const { lastInsertRowid } = this.db.prepare('INSERT INTO customers (name) VALUES (?)').run(name);
+    return this.db
+      .prepare('SELECT id, name, trees_planted, last_seen_at, created_at FROM customers WHERE id = ?')
+      .get(lastInsertRowid) as Customer;
+  }
 
-export function getAllCustomers(): (Customer & { total_visits: number })[] {
-  return getDb().prepare(`
-    SELECT c.id, c.name, c.trees_planted, c.last_seen_at, c.created_at,
-           COUNT(v.id) AS total_visits
-    FROM customers c
-    LEFT JOIN visits v ON v.customer_id = c.id
-    GROUP BY c.id
-    ORDER BY c.last_seen_at DESC
-  `).all() as (Customer & { total_visits: number })[];
-}
+  findById(id: number): Customer | undefined {
+    return this.db
+      .prepare('SELECT id, name, trees_planted, last_seen_at, created_at FROM customers WHERE id = ?')
+      .get(id) as Customer | undefined;
+  }
 
-export function updateLastSeen(id: number): void {
-  getDb().prepare('UPDATE customers SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
-}
+  findAll(): (Customer & { total_visits: number })[] {
+    return this.db.prepare(`
+      SELECT c.id, c.name, c.trees_planted, c.last_seen_at, c.created_at,
+             COUNT(v.id) AS total_visits
+      FROM customers c
+      LEFT JOIN visits v ON v.customer_id = c.id
+      GROUP BY c.id
+      ORDER BY c.last_seen_at DESC
+    `).all() as (Customer & { total_visits: number })[];
+  }
 
-export function incrementTreesPlanted(id: number): void {
-  getDb().prepare('UPDATE customers SET trees_planted = trees_planted + 1 WHERE id = ?').run(id);
-}
+  updateLastSeen(id: number): void {
+    this.db.prepare('UPDATE customers SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  }
 
-export function getVisitCount(customerId: number): number {
-  const row = getDb()
-    .prepare('SELECT COUNT(*) AS count FROM visits WHERE customer_id = ?')
-    .get(customerId) as { count: number };
-  return row.count;
-}
+  incrementTreesPlanted(id: number): void {
+    this.db.prepare('UPDATE customers SET trees_planted = trees_planted + 1 WHERE id = ?').run(id);
+  }
 
-export function getTreesPlanted(customerId: number): number {
-  const row = getDb()
-    .prepare('SELECT trees_planted FROM customers WHERE id = ?')
-    .get(customerId) as { trees_planted: number };
-  return row.trees_planted;
+  getVisitCount(customerId: number): number {
+    const row = this.db
+      .prepare('SELECT COUNT(*) AS count FROM visits WHERE customer_id = ?')
+      .get(customerId) as { count: number };
+    return row.count;
+  }
+
+  getTreesPlanted(customerId: number): number {
+    const row = this.db
+      .prepare('SELECT trees_planted FROM customers WHERE id = ?')
+      .get(customerId) as { trees_planted: number };
+    return row.trees_planted;
+  }
 }

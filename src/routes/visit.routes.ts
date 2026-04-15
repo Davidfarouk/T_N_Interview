@@ -1,10 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import { processVisit } from '../services/visit.service';
-import { getRecentVisits } from '../repositories/visit.repo';
+import { VisitService } from '../services/visit.service';
 import { visitBodySchema, visitResponseSchema } from '../schemas/visit.schema';
 import { errorSchema } from '../schemas/error.schema';
 
-export async function visitRoutes(fastify: FastifyInstance): Promise<void> {
+export async function visitRoutes(
+  fastify: FastifyInstance,
+  opts: { visitService: VisitService },
+): Promise<void> {
+  const { visitService } = opts;
+
   fastify.get('/visits', {
     schema: {
       tags: ['Visits'],
@@ -32,9 +36,8 @@ export async function visitRoutes(fastify: FastifyInstance): Promise<void> {
       },
     },
   }, async (request, reply) => {
-    // limit is always defined — schema default applies when param is absent
     const { limit } = request.query as { limit: number };
-    return reply.send(getRecentVisits(limit).map(v => ({
+    return reply.send(visitService.listRecent(limit).map(v => ({
       id:           v.id,
       customerId:   v.customer_id,
       customerName: v.customer_name,
@@ -52,6 +55,6 @@ export async function visitRoutes(fastify: FastifyInstance): Promise<void> {
     },
   }, async (request, reply) => {
     const { customerId } = request.body as { customerId: number };
-    return reply.send(processVisit(customerId));
+    return reply.send(visitService.processVisit(customerId));
   });
 }

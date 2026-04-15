@@ -15,13 +15,3 @@ export function getDb(): Database.Database {
   }
   return db;
 }
-
-/** Wraps a function in a SQLite transaction. Used by the service layer. */
-export function withTransaction<T>(fn: () => T): T {
-  return getDb().transaction(fn)();
-}
-
-/** Override the database instance — used in tests to inject an in-memory DB. */
-export function setDb(newDb: Database.Database): void {
-  db = newDb;
-}

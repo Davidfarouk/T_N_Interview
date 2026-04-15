@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { setDb } from '../db/database';
 import { runMigrations } from '../db/migrations';
 import { buildApp } from '../app';
 import type { FastifyInstance } from 'fastify';
@@ -13,8 +12,7 @@ function makeTestDb(): Database.Database {
 }
 
 async function setup(): Promise<FastifyInstance> {
-  setDb(makeTestDb());
-  return buildApp(false);
+  return buildApp(false, makeTestDb());
 }
 
 // ─── POST /customers ──────────────────────────────────────────────────────────
